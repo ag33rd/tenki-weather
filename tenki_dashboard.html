@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>天気ダッシュボード</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --good: #3fb950;
+      --warn: #d29922;
+      --danger: #f85149;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Meiryo', 'Yu Gothic', 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      padding: 10px 14px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 1400px;
+      margin: 0 auto 10px;
+      padding: 4px 8px;
+    }
+    .header-left { text-align: left; }
+    .header-right { text-align: right; }
+    #clock {
+      font-size: 2.4rem;
+      font-weight: 300;
+      color: var(--text);
+      letter-spacing: 0.05em;
+      line-height: 1;
+    }
+    #date-display {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    #location-info {
+      font-size: 0.85rem;
+      color: var(--accent);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 10px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px 6px;
+      text-align: center;
+    }
+    .card.full { grid-column: span 12; }
+    .card.half { grid-column: span 2; }
+    .weather-card { grid-column: span 2; }
+    .graph-card   { grid-column: span 12; }
+
+    .card-icon { font-size: 1.4rem; margin-bottom: 2px; line-height: 1; }
+    .card-label {
+      font-size: 0.62rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 3px;
+    }
+    .card-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .unit { font-size: 0.8rem; font-weight: 400; color: var(--muted); }
+    .small-unit { font-size: 0.55rem; font-weight: 400; color: var(--muted); }
+    .card-sub {
+      font-size: 0.66rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* 天気カード */
+    .weather-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 6px 4px;
+    }
+    .weather-icon-big { font-size: 1.5rem; line-height: 1; }
+    .weather-desc { font-size: 0.9rem; font-weight: 700; }
+    .weather-range { font-size: 0.66rem; color: var(--muted); margin-top: 1px; line-height: 1.3; }
+
+    /* 前日比 */
+    .up   { color: var(--danger); }
+    .down { color: var(--accent); }
+    .same { color: var(--muted); }
+
+    /* ステータス色 */
+    .good   { color: var(--good); }
+    .warn   { color: var(--warn); }
+    .danger { color: var(--danger); }
+    .normal { color: var(--text); }
+
+    /* 花粉リンク */
+    .pollen-links {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+      flex-direction: column;
+    }
+    .pollen-link {
+      background: #21262d;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 6px 8px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.78rem;
+    }
+
+    /* 更新ボタン */
+    .controls {
+      text-align: center;
+      margin: 10px auto;
+      max-width: 1400px;
+    }
+    .refresh-btn {
+      background: #21262d;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 28px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #last-updated {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    /* ローディング */
+    .loading { opacity: 0.4; }
+
+    /* グラフカード */
+    .graph-card { padding: 14px 8px 8px; }
+    .graph-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 12px 6px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    #weather-graph {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* 縦タブレット・スマホ（768px以下） */
+    @media (max-width: 768px) {
+      header { flex-direction: column; text-align: center; }
+      .header-left, .header-right { text-align: center; }
+      .grid { grid-template-columns: repeat(2, 1fr); }
+      .card.full, .weather-card, .graph-card { grid-column: span 2; }
+      .card.half { grid-column: span 1; }
+      .card-value { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div id="clock">--:--</div>
+    <div id="date-display">---</div>
+  </div>
+  <div class="header-right">
+    <div id="location-info">📍 位置情報取得中...</div>
+  </div>
+</header>
+
+<div class="grid" id="grid">
+
+  <!-- 24時間予報グラフ -->
+  <div class="card full graph-card">
+    <div class="graph-header">
+      <span>24時間予報　<span style="color:var(--muted); font-size:0.75rem;">実線=今日(tenki.jp) ・ 破線=昨日(気象庁アメダス実測)</span></span>
+      <span id="sun-info">🌅 -- / 🌇 --</span>
+    </div>
+    <svg id="weather-graph" viewBox="0 0 800 220" preserveAspectRatio="xMidYMid meet"></svg>
+  </div>
+
+  <!-- 天気 -->
+  <div class="card weather-card" id="card-weather">
+    <div class="weather-icon-big" id="weather-icon">⏳</div>
+    <div class="weather-desc" id="weather-desc">取得中...</div>
+    <div class="weather-range" id="weather-range"></div>
+  </div>
+
+  <!-- 気温 -->
+  <div class="card half">
+    <div class="card-icon">🌡️</div>
+    <div class="card-label">気温（現在）</div>
+    <div class="card-value" id="temp-now">--<span class="unit">°C</span></div>
+    <div class="card-sub">最高 <span id="temp-max">--</span> / 最低 <span id="temp-min">--</span> °C</div>
+  </div>
+
+  <!-- 湿度 -->
+  <div class="card half">
+    <div class="card-icon">💧</div>
+    <div class="card-label">湿度</div>
+    <div class="card-value" id="humidity">--<span class="unit">%</span></div>
+    <div class="card-sub" id="humidity-status"></div>
+  </div>
+
+  <!-- 黄砂 -->
+  <div class="card half">
+    <div class="card-icon">🟡</div>
+    <div class="card-label">黄砂（大気塵）</div>
+    <div class="card-value" id="dust">--<span class="small-unit">μg/m³</span></div>
+    <div class="card-sub" id="dust-status"></div>
+  </div>
+
+  <!-- PM2.5 -->
+  <div class="card half">
+    <div class="card-icon">🌫️</div>
+    <div class="card-label">PM2.5</div>
+    <div class="card-value" id="pm25">--<span class="small-unit">μg/m³</span></div>
+    <div class="card-sub" id="pm25-status"></div>
+  </div>
+
+  <!-- スギ花粉 -->
+  <div class="card half">
+    <div class="card-icon">🌸</div>
+    <div class="card-label">スギ花粉（目安）</div>
+    <div class="card-value" id="pollen-value">--</div>
+    <div class="card-sub" id="pollen-sub">--</div>
+  </div>
+
+  <!-- 週間予報（最下段） -->
+  <div class="card full">
+    <div class="card-label" style="text-align:left; padding-left:6px; margin-bottom:6px;">週間予報　<span style="color:var(--muted); text-transform:none;">tenki.jp 宇部市</span></div>
+    <div id="weekly-list" style="display:flex; gap:6px; padding:0 4px;"></div>
+  </div>
+
+</div>
+
+<div class="controls">
+  <button class="refresh-btn" onclick="loadAll()">🔄 今すぐ更新</button>
+  <div id="last-updated"></div>
+</div>
+
+<script>
+// tenki.jp の天気文字列（晴/曇/雨など）→ 絵文字
+// isNight=true の場合、晴れ・薄曇り系を月マークに置き換え
+function tenkiIcon(text, isNight = false) {
+  if (!text) return '🌡️';
+  if (text.includes('雷')) return '⛈️';
+  if (text.includes('みぞれ')) return '🌨️';
+  if (text.includes('雪') && text.includes('雨')) return '🌨️';
+  if (text.includes('雪')) return '❄️';
+  if (text.includes('大雨')) return '🌧️';
+  if (text.includes('小雨')) return '🌦️';
+  if (text.includes('時々雨') || text.includes('一時雨')) return '🌦️';
+  if (text.includes('雨'))   return '🌧️';
+  if (text.includes('曇') && text.includes('晴')) return isNight ? '☁️' : '⛅';
+  if (text.includes('晴') && text.includes('曇')) return isNight ? '☁️' : '🌤️';
+  if (text.includes('曇')) return '☁️';
+  if (text.includes('晴')) return isNight ? '🌙' : '☀️';
+  if (text.includes('霧')) return '🌫️';
+  return '🌡️';
+}
+
+// 天気文字列の判定ヘルパー
+function isRainyText(t)  { return !!t && /雨|雷|みぞれ/.test(t); }
+function isSnowyText(t)  { return !!t && /雪/.test(t) && !/雨/.test(t); }
+function isSunnyText(t)  { return !!t && /晴/.test(t) && !/曇|雨|雪/.test(t); }
+
+function pm25Label(v) {
+  if (v <= 12)  return ['少ない', 'good'];
+  if (v <= 35)  return ['普通',   'normal'];
+  if (v <= 55)  return ['やや多い', 'warn'];
+  return ['多い', 'danger'];
+}
+function dustLabel(v) {
+  if (v <= 50)  return ['少ない', 'good'];
+  if (v <= 200) return ['やや多い', 'warn'];
+  return ['多い', 'danger'];
+}
+function humLabel(v) {
+  if (v < 30)  return ['乾燥', 'warn'];
+  if (v <= 60) return ['快適', 'good'];
+  if (v <= 80) return ['やや高い', 'normal'];
+  return ['高湿', 'warn'];
+}
+
+function setText(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+
+// 時計
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('date-display').textContent =
+    now.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+}
+
+// スギ花粉飛散カレンダー（山口県基準・要確認：シーズンは概ね2〜4月）
+// 月-日 → ベース飛散レベル (0:なし, 1:わずか, 2:少ない, 3:やや多い, 4:多い, 5:非常に多い)
+function pollenBaseLevel(month, day) {
+  // 2月: 上旬わずか → 下旬多い
+  if (month === 2) {
+    if (day <= 10) return 1;
+    if (day <= 20) return 2;
+    return 3;
+  }
+  // 3月: ピーク
+  if (month === 3) {
+    if (day <= 10) return 4;
+    if (day <= 25) return 5;
+    return 4;
+  }
+  // 4月: 多→中（後半はヒノキ混在）
+  if (month === 4) {
+    if (day <= 10) return 3;
+    if (day <= 20) return 2;
+    return 1;
+  }
+  // それ以外（5〜1月）: シーズン外
+  return 0;
+}
+
+// 気象条件で補正（晴れ・気温高・湿度低で飛散UP / 雨・雪でDOWN）
+function pollenAdjust(base, weatherText, tempMax, humidity) {
+  if (base === 0) return 0;
+  let level = base;
+  if (isRainyText(weatherText))  level -= 2;
+  else if (isSnowyText(weatherText)) level -= 1;
+  if (isSunnyText(weatherText))  level += 1;
+  if (tempMax != null && tempMax >= 15) level += 1;
+  if (tempMax != null && tempMax < 5)   level -= 1;
+  if (humidity != null && humidity < 40) level += 1;
+  if (humidity != null && humidity > 80) level -= 1;
+  return Math.max(0, Math.min(5, level));
+}
+
+const POLLEN_LABEL = [
+  ['なし',       'good',   '飛散シーズン外'],
+  ['わずか',     'good',   'ほぼ飛ばない'],
+  ['少ない',     'normal', '敏感な人は注意'],
+  ['やや多い',   'warn',   'マスク推奨'],
+  ['多い',       'warn',   '外出時は対策必須'],
+  ['非常に多い', 'danger', '長時間の外出は控える'],
+];
+
+function updatePollen(weatherCode, tempMax, humidity) {
+  const now = new Date();
+  const base = pollenBaseLevel(now.getMonth() + 1, now.getDate());
+  const lv = pollenAdjust(base, weatherCode, tempMax, humidity);
+  const [label, cls, sub] = POLLEN_LABEL[lv];
+  setText('pollen-value',
+    `<span class="${cls}" style="font-size:1.6rem;">${label}</span>` +
+    `<div style="font-size:0.85rem; margin-top:4px; color:var(--muted);">レベル ${lv}/5</div>`
+  );
+  setText('pollen-sub', sub);
+}
+
+// 週間予報のレンダリング
+function renderWeekly(weekly) {
+  const list = document.getElementById('weekly-list');
+  if (!list) return;
+  if (!Array.isArray(weekly) || weekly.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted); font-size:0.8rem; padding:8px;">週間予報を取得できませんでした</div>';
+    return;
+  }
+  const days = weekly.slice(0, 7);
+  list.innerHTML = days.map(d => {
+    const wd = d.weekday || '';
+    const wdColor = wd === '日' ? '#f85149' : wd === '土' ? '#58a6ff' : 'var(--muted)';
+    const dateLabel = d.date ? d.date.slice(5).replace('-', '/') : '--';
+    const icon = tenkiIcon(d.weather);
+    const tmax = d.temp_max != null ? d.temp_max.toFixed(0) : '--';
+    const tmin = d.temp_min != null ? d.temp_min.toFixed(0) : '--';
+    const pop  = d.pop != null ? d.pop : '--';
+    return `
+      <div style="flex:1; text-align:center; background:#21262d; border:1px solid var(--border); border-radius:8px; padding:6px 4px; min-width:70px;">
+        <div style="font-size:0.72rem; color:${wdColor}; font-weight:700;">${dateLabel} (${wd})</div>
+        <div style="font-size:1.6rem; line-height:1.1;">${icon}</div>
+        <div style="font-size:0.7rem; color:var(--muted); height:1.2em; overflow:hidden;">${d.weather || ''}</div>
+        <div style="font-size:0.85rem; margin-top:2px;">
+          <span style="color:#f85149; font-weight:700;">${tmax}°</span>
+          <span style="color:var(--muted);">/</span>
+          <span style="color:#58a6ff; font-weight:700;">${tmin}°</span>
+        </div>
+        <div style="font-size:0.7rem; color:#58a6ff;">☔ ${pop}%</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// 24時間予報グラフ描画
+function drawGraph(hours, sunrise, sunset) {
+  const W = 800, H = 220;
+  const padL = 30, padR = 30, padT = 20, padB = 90;
+  const graphH = H - padT - padB;
+  const graphW = W - padL - padR;
+  const N = hours.length;
+
+  const validToday = hours.map(h => h.temp).filter(t => t != null);
+  const validYst   = hours.map(h => h.yTemp).filter(t => t != null);
+  if (validToday.length === 0) {
+    document.getElementById('weather-graph').innerHTML =
+      '<text x="400" y="140" text-anchor="middle" fill="#8b949e" font-size="14">データ取得失敗</text>';
+    return;
+  }
+
+  const all = [...validToday, ...validYst];
+  let tMin = Math.floor(Math.min(...all)) - 2;
+  let tMax = Math.ceil(Math.max(...all)) + 3;
+  const xStep = graphW / (N - 1);
+  const yScale = t => padT + graphH - ((t - tMin) / (tMax - tMin)) * graphH;
+  const xAt = i => padL + i * xStep;
+
+  // パス生成
+  const buildPath = key => {
+    let path = '', started = false;
+    hours.forEach((h, i) => {
+      if (h[key] == null) return;
+      path += (started ? 'L' : 'M') + xAt(i).toFixed(1) + ',' + yScale(h[key]).toFixed(1) + ' ';
+      started = true;
+    });
+    return path;
+  };
+  const todayPath = buildPath('temp');
+  const ystrPath  = buildPath('yTemp');
+
+  let svg = '';
+
+  // 日の出・日の入りのx座標を xAt(i) と完全に一致させるため、
+  // hours配列のデータポイント間を直接補間してx座標を求める方式に変更。
+  // day_offset や dataSpan の誤差に左右されない最も確実な方法。
+
+  // 各データポイントの絶対時間（時間単位、小数対応）
+  const absHoursOf = h => (h.day_offset ?? 0) * 24 + (h.hour ?? 0);
+
+  // 指定時刻（hhmm="HH:MM"）の day 日目のx座標をhours配列から線形補間して返す。
+  // day=0,1,2 は hours[0].day_offset を「0」とした相対日数。
+  // これにより現在時刻に関わらず hours 配列の絶対時間軸と正確に一致する。
+  const baseDayOffset = hours[0].day_offset ?? 0;
+  const findX = (hhmm, day) => {
+    if (!hhmm) return null;
+    const [sh, sm] = hhmm.split(':').map(Number);
+    const target = (baseDayOffset + day) * 24 + sh + sm / 60;
+    for (let i = 0; i < hours.length - 1; i++) {
+      const a = absHoursOf(hours[i]);
+      const b = absHoursOf(hours[i + 1]);
+      if (target >= a && target <= b) {
+        const t = (b > a) ? (target - a) / (b - a) : 0;
+        return xAt(i) + t * xStep;
+      }
+    }
+    return null; // データ範囲外
+  };
+
+  const parseHM = (hhmm) => {
+    if (!hhmm) return null;
+    const [h, m] = hhmm.split(':').map(Number);
+    return h * 3600 + m * 60;
+  };
+  const sunriseSec = parseHM(sunrise);
+  const sunsetSec  = parseHM(sunset);
+
+  // 日中（日の出〜日の入り）の背景（今日・明日・明後日の3日分を試行）
+  for (let day = 0; day <= 2; day++) {
+    const x1 = findX(sunrise, day);
+    const x2 = findX(sunset,  day);
+    if (x1 != null && x2 != null && x2 > x1) {
+      const rx1 = Math.max(padL, Math.min(padL + graphW, x1));
+      const rx2 = Math.max(padL, Math.min(padL + graphW, x2));
+      if (rx2 > rx1) {
+        svg += `<rect x="${rx1.toFixed(1)}" y="${padT}" width="${(rx2 - rx1).toFixed(1)}" height="${graphH}" fill="rgba(255,200,80,0.07)"/>`;
+      }
+    }
+  }
+
+  // 日の出・日の入りの縦線（今日・明日・明後日の3日分を試行）
+  const drawSunLine = (hhmm, color, icon) => {
+    if (!hhmm) return;
+    for (let day = 0; day <= 2; day++) {
+      const x = findX(hhmm, day);
+      if (x != null && x >= padL && x <= padL + graphW) {
+        svg += `<line x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${padT + graphH}" stroke="${color}" stroke-width="1" stroke-dasharray="3,3" opacity="0.55"/>`;
+        svg += `<text x="${x.toFixed(1)}" y="${padT - 3}" text-anchor="middle" fill="${color}" font-size="10">${icon}${hhmm}</text>`;
+      }
+    }
+  };
+  drawSunLine(sunrise, '#d29922', '🌅');
+  drawSunLine(sunset,  '#58a6ff', '🌇');
+
+  // 昨日の破線
+  if (ystrPath) {
+    svg += `<path d="${ystrPath}" stroke="#8b949e" stroke-width="2" fill="none" stroke-dasharray="5,4" opacity="0.7"/>`;
+  }
+  // 今日の実線
+  svg += `<path d="${todayPath}" stroke="#e6edf3" stroke-width="2.5" fill="none" stroke-linejoin="round"/>`;
+
+  // 最高・最低 index
+  let maxIdx = 0, minIdx = 0;
+  hours.forEach((h, i) => {
+    if (h.temp == null) return;
+    if (h.temp > hours[maxIdx].temp) maxIdx = i;
+    if (h.temp < hours[minIdx].temp) minIdx = i;
+  });
+
+  const skipIdx = new Set([0, maxIdx, minIdx]);
+
+  // 2時間ごとの気温表示（中間ポイント）
+  hours.forEach((h, i) => {
+    if (i % 2 !== 0 || h.temp == null || skipIdx.has(i)) return;
+    const x = xAt(i), y = yScale(h.temp);
+    svg += `<circle cx="${x}" cy="${y}" r="3" fill="#e6edf3" opacity="0.85"/>`;
+    svg += `<text x="${x}" y="${y - 9}" text-anchor="middle" fill="#e6edf3" font-size="12" font-weight="600">${h.temp.toFixed(0)}°</text>`;
+  });
+
+  // 現在気温ラベル（黄色）
+  const cx = xAt(0), cy = yScale(hours[0].temp);
+  svg += `<circle cx="${cx}" cy="${cy}" r="6" fill="#d29922"/>`;
+  svg += `<rect x="${cx - 26}" y="${cy - 34}" width="52" height="22" rx="11" fill="#d29922"/>`;
+  svg += `<text x="${cx}" y="${cy - 19}" text-anchor="middle" fill="white" font-size="13" font-weight="bold">${hours[0].temp.toFixed(0)}℃</text>`;
+
+  // 最高気温ラベル（赤）
+  if (maxIdx > 0) {
+    const mx = xAt(maxIdx), my = yScale(hours[maxIdx].temp);
+    svg += `<circle cx="${mx}" cy="${my}" r="5" fill="#f85149"/>`;
+    svg += `<rect x="${mx - 26}" y="${my - 34}" width="52" height="22" rx="11" fill="#f85149"/>`;
+    svg += `<text x="${mx}" y="${my - 19}" text-anchor="middle" fill="white" font-size="13" font-weight="bold">${hours[maxIdx].temp.toFixed(0)}℃</text>`;
+  }
+
+  // 最低気温ラベル（青）
+  if (minIdx > 0 && minIdx !== maxIdx) {
+    const lx = xAt(minIdx), ly = yScale(hours[minIdx].temp);
+    svg += `<circle cx="${lx}" cy="${ly}" r="5" fill="#58a6ff"/>`;
+    svg += `<rect x="${lx - 26}" y="${ly + 10}" width="52" height="22" rx="11" fill="#58a6ff"/>`;
+    svg += `<text x="${lx}" y="${ly + 25}" text-anchor="middle" fill="white" font-size="13" font-weight="bold">${hours[minIdx].temp.toFixed(0)}℃</text>`;
+  }
+
+  // 2時間ごとのラベル（時刻、アイコン、降水確率、降水量）
+  const yTime   = H - padB + 14;
+  const yIcon   = H - padB + 36;
+  const yPop    = H - padB + 56;
+  const yPrecip = H - padB + 72;
+
+  hours.forEach((h, i) => {
+    if (i % 2 !== 0) return;
+    const x = xAt(i);
+    const hr = (h.hour != null) ? h.hour : i;
+    // 時刻
+    svg += `<text x="${x}" y="${yTime}" text-anchor="middle" fill="#8b949e" font-size="13">${hr}</text>`;
+    // 区切りドット
+    svg += `<text x="${x + xStep}" y="${yTime}" text-anchor="middle" fill="#30363d" font-size="13">·</text>`;
+    // 夜間判定（absHoursOf で時間単位に統一して比較）
+    let isNight = false;
+    if (sunriseSec != null && sunsetSec != null && h.hour != null) {
+      const hAbsH   = absHoursOf(h);
+      const riseH   = sunriseSec / 3600;
+      const setH    = sunsetSec  / 3600;
+      let isDaytime = false;
+      for (let d = 0; d <= 2; d++) {
+        if (hAbsH >= d * 24 + riseH && hAbsH < d * 24 + setH) {
+          isDaytime = true;
+          break;
+        }
+      }
+      isNight = !isDaytime;
+    }
+    // 天気アイコン（夜間なら月マーク）
+    const icon = tenkiIcon(h.weather, isNight);
+    svg += `<text x="${x}" y="${yIcon}" text-anchor="middle" font-size="20">${icon}</text>`;
+    // 降水確率
+    if (h.pop != null) {
+      svg += `<text x="${x}" y="${yPop}" text-anchor="middle" fill="#58a6ff" font-size="12" font-weight="bold">${h.pop}%</text>`;
+    }
+    // 降水量(mm)　0は非表示
+    if (h.precipitation != null && h.precipitation > 0) {
+      svg += `<text x="${x}" y="${yPrecip}" text-anchor="middle" fill="#79c0ff" font-size="8">${h.precipitation.toFixed(1)}mm</text>`;
+    }
+  });
+
+  document.getElementById('weather-graph').innerHTML = svg;
+
+  // 日の出・日の入り（"05:19" 形式または ISO 形式の両対応）
+  const fmt = s => {
+    if (!s) return '--';
+    if (s.includes('T')) return s.slice(11, 16);
+    return s;
+  };
+  document.getElementById('sun-info').textContent = `🌅 ${fmt(sunrise)} / 🌇 ${fmt(sunset)}`;
+}
+
+// 3時間刻みの hourly データを1時間刻みに線形補間する
+function interpolateToHourly(arr) {
+  if (arr.length < 2) return arr;
+  const result = [];
+  for (let i = 0; i < arr.length - 1; i++) {
+    const a = arr[i], b = arr[i + 1];
+    const aAbs = (a.day_offset ?? 0) * 24 + (a.hour ?? 0);
+    const bAbs = (b.day_offset ?? 0) * 24 + (b.hour ?? 0);
+    const steps = bAbs - aAbs; // 隣接点間の時間間隔（例: 3時間）
+    result.push(a);
+    if (steps <= 0) continue; // 時間が逆行・同値の場合はスキップ（day_offset不整合への安全策）
+    for (let s = 1; s < steps; s++) {
+      const t = s / steps;
+      const absH = aAbs + s;
+      result.push({
+        hour:          absH % 24,
+        day_offset:    Math.floor(absH / 24),
+        // 気温：線形補間
+        temp:          (a.temp != null && b.temp != null)
+                         ? +((a.temp + (b.temp - a.temp) * t).toFixed(1))
+                         : a.temp,
+        // 天気・降水確率：前の値を引き継ぎ
+        weather:       a.weather,
+        pop:           a.pop,
+        // 降水量：均等分配（3時間分を1時間あたりに換算）
+        precipitation: a.precipitation != null
+                         ? +((a.precipitation / steps).toFixed(1))
+                         : null,
+      });
+    }
+  }
+  result.push(arr[arr.length - 1]);
+  return result;
+}
+
+// 昨日の気温（気象庁アメダス宇部の実測値）を取得 → hour→temp の map
+async function fetchPastTemps() {
+  try {
+    let d;
+    if (window._YESTERDAY_DATA) {
+      d = window._YESTERDAY_DATA;
+    } else {
+      const r = await fetch('/api/yesterday', { cache: 'no-store' });
+      if (!r.ok) return null;
+      d = await r.json();
+    }
+    if (d.error || !Array.isArray(d.hourly)) return null;
+    const map = {};
+    d.hourly.forEach(h => {
+      if (h.temp != null && h.hour != null) {
+        // tenki.jp と整合させるため 24時 → 0時 として扱う
+        const hr = h.hour === 24 ? 0 : h.hour;
+        map[hr] = h.temp;
+      }
+    });
+    return map;
+  } catch (e) {
+    console.warn('Yesterday API fetch failed:', e);
+    return null;
+  }
+}
+
+async function fetchWeather() {
+  let d;
+  if (window._WEATHER_DATA) {
+    d = window._WEATHER_DATA;
+    if (d.error) throw new Error(d.error);
+  } else {
+    const r = await fetch('/api/weather', { cache: 'no-store' });
+    if (!r.ok) throw new Error('server error');
+    d = await r.json();
+    if (d.error) throw new Error(d.error);
+  }
+
+  // 天気
+  setText('weather-icon', tenkiIcon(d.weather));
+  setText('weather-desc', d.weather || '--');
+
+  // 気温
+  if (d.temp_now != null) {
+    setText('temp-now', `${d.temp_now.toFixed(1)}<span class="unit">°C</span>`);
+  }
+  setText('temp-max', d.temp_max != null ? d.temp_max.toFixed(1) : '--');
+  setText('temp-min', d.temp_min != null ? d.temp_min.toFixed(1) : '--');
+
+  // 天気カードの気温レンジ  例: 最高22.0°（-0.8℃）/ 最低11.0℃
+  let rangeHtml = '';
+  if (d.temp_max != null) {
+    rangeHtml += `最高 ${d.temp_max.toFixed(1)}°`;
+    if (d.temp_diff_yesterday != null) {
+      const dn = d.temp_diff_yesterday;
+      const sign = dn > 0 ? '+' : '';
+      const cls  = dn > 0 ? 'up' : dn < 0 ? 'down' : 'same';
+      rangeHtml += `<span class="${cls}">（${sign}${dn.toFixed(1)}℃）</span>`;
+    }
+  }
+  if (d.temp_min != null) {
+    rangeHtml += ` / 最低 ${d.temp_min.toFixed(1)}℃`;
+  }
+  setText('weather-range', rangeHtml || '--');
+
+  // 湿度
+  if (d.humidity != null) {
+    setText('humidity', `${d.humidity}<span class="unit">%</span>`);
+    const [ht, hc] = humLabel(d.humidity);
+    setText('humidity-status', `<span class="${hc}">${ht}</span>`);
+  }
+
+  // スギ花粉（簡易予測：天気文字列・最高気温・湿度から算出）
+  updatePollen(d.weather, d.temp_max, d.humidity);
+
+  // 週間予報（当日が含まれていなければ先頭に当日分を追加）
+  let weeklyList = Array.isArray(d.weekly) ? d.weekly.slice() : [];
+  const todayIso = new Date().toISOString().slice(0, 10);
+  if (weeklyList.length === 0 || weeklyList[0].date !== todayIso) {
+    const wdJp = ['日','月','火','水','木','金','土'];
+    // 今日のpopは hourly の最大値から推定
+    let todayPop = null;
+    if (Array.isArray(d.hourly)) {
+      const pops = d.hourly.filter(h => h.day_offset === 0 && h.pop != null).map(h => h.pop);
+      if (pops.length > 0) todayPop = Math.max(...pops);
+    }
+    weeklyList.unshift({
+      date:     todayIso,
+      weekday:  wdJp[new Date().getDay()],
+      weather:  d.weather,
+      temp_max: d.temp_max,
+      temp_min: d.temp_min,
+      pop:      todayPop,
+    });
+  }
+  renderWeekly(weeklyList);
+
+  // 24時間グラフ用データ整形
+  // tenki.jp の hourly は最大72時間分（今日・明日・明後日）×{day_offset, hour, temp, weather, pop}
+  // 「今日の現在時刻」の位置から25点を切り出して24時間先までを表示
+  const nowH = new Date().getHours();
+  const arr = Array.isArray(d.hourly) ? d.hourly : [];
+  // tenki.jp の 1hour ページは時間帯によって3時間刻みになるため
+  // hour 完全一致では見つからないことがある。
+  // 現在時刻に最も近い（絶対値）スロットを選択する。
+  let startIdx = -1;
+  let bestDiff = Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    const h = arr[i];
+    if (h.hour == null || h.day_offset == null) continue;
+    const slot = h.day_offset * 24 + h.hour;
+    const diff = Math.abs(slot - nowH);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      startIdx = i;
+    }
+  }
+  if (startIdx < 0) startIdx = 0;
+  // 点数ではなく「現在時刻から24時間以内」のデータのみに絞る
+  // （3時間刻みでも1時間刻みでも正しく24時間分を切り出せる）
+  const startAbsH = (arr[startIdx].day_offset ?? 0) * 24 + (arr[startIdx].hour ?? 0);
+  const sliced = arr.slice(startIdx).filter(h => {
+    const absH = (h.day_offset ?? 0) * 24 + (h.hour ?? 0);
+    return absH - startAbsH <= 24;
+  });
+
+  // 3時間刻みデータを1時間刻みに補間してからグラフ描画に使う
+  const sliced1h = interpolateToHourly(sliced);
+
+  // 昨日同時刻の気温（気象庁アメダス宇部の実測値）を取得して破線描画用に紐付け
+  const pastMap = await fetchPastTemps();
+
+  // グラフ先頭点の絶対時間（hour単位）
+  const startAbsForYest = (sliced1h[0]?.day_offset ?? 0) * 24 + (sliced1h[0]?.hour ?? 0);
+
+  const hours = sliced1h.map(h => {
+    let yTemp = null;
+    if (pastMap && h.hour != null) {
+      // グラフ先頭からの相対オフセット（0〜24h）を求め、
+      // 昨日の「現在時刻＋同オフセット」の時刻に対応する気温を引く。
+      // h.hour だけで引くと day_offset=1 の深夜帯が昨日の同時刻と衝突してしまうため。
+      const absH = (h.day_offset ?? 0) * 24 + (h.hour ?? 0);
+      const offsetH = absH - startAbsForYest; // 0〜24
+      const yesterdayHour = ((nowH + offsetH) % 24 + 24) % 24;
+      const v = pastMap[yesterdayHour];
+      if (v != null) yTemp = v;
+    }
+    return {
+      hour:          h.hour,
+      day_offset:    h.day_offset,
+      temp:          h.temp,
+      weather:       h.weather,
+      pop:           h.pop,
+      precipitation: h.precipitation,
+      yTemp,
+    };
+  });
+
+  // pop（降水確率）が null の点に次の有効値を後ろから埋める
+  // tenki.jp は過去時刻の pop を "---" で返すため、最初の数時間が null になる対策
+  for (let i = hours.length - 2; i >= 0; i--) {
+    if (hours[i].pop == null && hours[i + 1].pop != null) {
+      hours[i] = { ...hours[i], pop: hours[i + 1].pop };
+    }
+  }
+
+  drawGraph(hours, d.sunrise, d.sunset);
+}
+
+// サーバー経由で宇部市の花粉レベル取得（Yahoo!天気 → tenki.jp フォールバック）
+function pollenColor(lv) {
+  if (!lv) return 'normal';
+  if (lv.includes('極めて多い') || lv.includes('非常に多い')) return 'danger';
+  if (lv.includes('やや多い') || lv === '多い') return 'warn';
+  if (lv.includes('少ない') || lv.includes('飛ばない') || lv.includes('なし')) return 'good';
+  return 'normal';
+}
+
+async function fetchPollenFromServer() {
+  try {
+    let d;
+    if (window._POLLEN_DATA) {
+      d = window._POLLEN_DATA;
+    } else {
+      const r = await fetch('/api/pollen', { cache: 'no-store' });
+      if (!r.ok) throw new Error('server error');
+      d = await r.json();
+    }
+    if (d.error || !d.level) {
+      console.warn('Pollen API:', d.error || 'no level');
+      return false;
+    }
+    const sugi   = d.sugi   || d.level;
+    const hinoki = d.hinoki;
+
+    // メイン表示はスギ
+    setText('pollen-value',
+      `<span class="${pollenColor(sugi)}" style="font-size:1.4rem;">${sugi}</span>`
+    );
+    // サブにヒノキも併記（あれば）
+    let sub = `${d.source} ${d.city}`;
+    if (hinoki) {
+      sub = `ヒノキ:<span class="${pollenColor(hinoki)}"> ${hinoki}</span>　/　${d.source}`;
+    }
+    setText('pollen-sub', sub);
+
+    const label = document.querySelector('#pollen-value')?.parentElement?.querySelector('.card-label');
+    if (label) label.textContent = 'スギ花粉（公式）';
+    return true;
+  } catch (e) {
+    console.warn('Pollen fetch failed:', e);
+    return false;
+  }
+}
+
+async function fetchAirQuality(lat, lon) {
+  const url = `https://air-quality-api.open-meteo.com/v1/air-quality`
+    + `?latitude=${lat}&longitude=${lon}`
+    + `&current=pm2_5,dust&timezone=Asia%2FTokyo`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('air quality API error');
+  const d = await r.json();
+  const cur = d.current;
+
+  // PM2.5
+  const pm = cur.pm2_5;
+  setText('pm25', `${pm != null ? pm.toFixed(1) : '--'}<span class="small-unit">μg/m³</span>`);
+  if (pm != null) {
+    const [t, c] = pm25Label(pm);
+    setText('pm25-status', `<span class="${c}">${t}</span>`);
+  }
+
+  // 黄砂（dust）
+  const du = cur.dust;
+  setText('dust', `${du != null ? du.toFixed(0) : '--'}<span class="small-unit">μg/m³</span>`);
+  if (du != null) {
+    const [t, c] = dustLabel(du);
+    setText('dust-status', `<span class="${c}">${t}</span>`);
+  }
+}
+
+// 逆ジオコーディング（Open-Meteo は地名を返さないため nominatim を使用）
+async function getLocationName(lat, lon) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ja`;
+    const r = await fetch(url, { headers: { 'Accept-Language': 'ja' } });
+    const d = await r.json();
+    const addr = d.address;
+    const name = addr.city || addr.town || addr.village || addr.county || '';
+    const pref = addr.state || '';
+    if (name || pref) return `📍 ${pref} ${name}`.trim();
+  } catch (e) { /* ignore */ }
+  return `📍 ${lat}, ${lon}`;
+}
+
+// 表示地点（宇部市・山口県）固定
+const LOCATION = {
+  name: '📍 山口県 宇部市',
+  lat: '33.98933229797937',
+  lon: '131.33380791452407',
+};
+
+async function loadAll() {
+  setText('last-updated', '更新中...');
+  document.getElementById('location-info').textContent = LOCATION.name;
+  await Promise.all([
+    fetchWeather().catch(e => {
+      console.error(e); setText('weather-desc', '取得エラー');
+    }),
+    fetchAirQuality(LOCATION.lat, LOCATION.lon).catch(e => {
+      console.error(e); setText('pm25', 'エラー'); setText('dust', 'エラー');
+    }),
+    fetchPollenFromServer(),  // Yahoo!天気から公式値（成功時は簡易予測を上書き）
+  ]);
+  const now = new Date();
+  setText('last-updated', `最終更新: ${now.toLocaleTimeString('ja-JP')}`);
+}
+
+// 時計を毎分更新
+setInterval(updateClock, 60000);
+updateClock();
+
+// 起動時にデータ読み込み
+loadAll();
+
+// Streamlit モード以外では30分ごとにJS側でも自動更新
+if (!window._WEATHER_DATA) {
+  setInterval(loadAll, 30 * 60 * 1000);
+}
+</script>
+</body>
+</html>
