@@ -14,11 +14,23 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Streamlit のヘッダー・フッター・余白を非表示
+# Streamlit のヘッダー・フッター・各種バッジ・余白を非表示
 st.markdown("""
 <style>
   #MainMenu, header, footer { display: none !important; }
   .block-container { padding: 0 !important; max-width: 100% !important; }
+  /* 右下・右上のStreamlitバッジ／ステータスウィジェット／ツールバーを非表示 */
+  [data-testid="stStatusWidget"],
+  [data-testid="stToolbar"],
+  [data-testid="stDecoration"],
+  [data-testid="manage-app-button"],
+  .stAppDeployButton,
+  [class*="viewerBadge"],
+  [class*="_profileContainer"],
+  [class*="_viewerBadge"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
 </style>
 """, unsafe_allow_html=True)
 
