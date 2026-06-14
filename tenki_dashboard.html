@@ -186,16 +186,6 @@
 </head>
 <body>
 
-<header>
-  <div class="header-left">
-    <div id="clock">--:--</div>
-    <div id="date-display">---</div>
-  </div>
-  <div class="header-right">
-    <div id="location-info">📍 位置情報取得中...</div>
-  </div>
-</header>
-
 <div class="grid" id="grid">
 
   <!-- 24時間予報グラフ -->
@@ -319,9 +309,11 @@ function setText(id, html) {
 // 時計
 function updateClock() {
   const now = new Date();
-  document.getElementById('clock').textContent =
+  const clk = document.getElementById('clock');
+  if (clk) clk.textContent =
     now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-  document.getElementById('date-display').textContent =
+  const dt = document.getElementById('date-display');
+  if (dt) dt.textContent =
     now.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
 }
 
@@ -917,7 +909,8 @@ const LOCATION = {
 
 async function loadAll() {
   setText('last-updated', '更新中...');
-  document.getElementById('location-info').textContent = LOCATION.name;
+  const loc = document.getElementById('location-info');
+  if (loc) loc.textContent = LOCATION.name;
   await Promise.all([
     fetchWeather().catch(e => {
       console.error(e); setText('weather-desc', '取得エラー');
