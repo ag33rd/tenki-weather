@@ -938,8 +938,19 @@ updateClock();
 // 起動時にデータ読み込み
 loadAll();
 
-// Streamlit モード以外では30分ごとにJS側でも自動更新
-if (!window._WEATHER_DATA) {
+// 自動更新
+if (window._WEATHER_DATA) {
+  // Streamlit モード: 30分ごとにページ全体をリロードしてPython側で最新データを再取得
+  setInterval(function () {
+    try {
+      // srcdoc iframe は親と同一オリジンのため top をリロードできる
+      (window.top || window).location.reload();
+    } catch (e) {
+      window.location.reload();
+    }
+  }, 30 * 60 * 1000);
+} else {
+  // ローカルサーバーモード: JS側で再取得
   setInterval(loadAll, 30 * 60 * 1000);
 }
 </script>
