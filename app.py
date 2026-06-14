@@ -18,7 +18,21 @@ st.set_page_config(
 st.markdown("""
 <style>
   #MainMenu, header, footer { display: none !important; }
-  .block-container { padding: 0 !important; max-width: 100% !important; }
+  .block-container {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+  /* 上部の余白を徹底除去 */
+  [data-testid="stAppViewContainer"] > .main,
+  [data-testid="stMain"] { padding-top: 0 !important; }
+  [data-testid="stAppViewBlockContainer"] { padding-top: 0 !important; }
+  [data-testid="stHeader"] { display: none !important; height: 0 !important; }
+  [data-testid="stVerticalBlock"] { gap: 0 !important; }
+  .stApp { margin-top: 0 !important; }
+  /* 埋め込みiframe自体の余白を除去 */
+  iframe { display: block !important; margin: 0 !important; }
+  [data-testid="stElementContainer"]:first-child { margin-top: 0 !important; }
   /* 右下・右上のStreamlitバッジ／ステータスウィジェット／ツールバーを非表示 */
   [data-testid="stStatusWidget"],
   [data-testid="stToolbar"],
